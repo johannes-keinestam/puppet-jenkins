@@ -69,19 +69,24 @@ define jenkins::plugin(
       }
     }
 
-    exec { "download-${name}" :
-      command    => "rm -rf ${name} ${name}.* && wget --no-check-certificate ${base_url}${plugin}",
+    # Uninstall plugin and restart Jenkins before trying to install
+    # plugin. Necessary for forcing Jenkins core plugins to update
+    exec { "uninstall-${name}" :
+      command    => "rm -rf ${name} ${name}.*",
       cwd        => $plugin_dir,
       require    => [File[$plugin_dir], Package['wget']],
       path       => ['/usr/bin', '/usr/sbin', '/bin'],
+      notify     => Service['jenkins']
+    }
+    ->
+    exec { "install-${name}":
+      command    => "wget --no-check-certificate ${base_url}${plugin}",
+      cwd        => $plugin_dir,
+      require    => [File[$plugin_dir], Package['wget']],
+      path       => ['/usr/bin', '/usr/sbin', '/bin'],
+      notify     => Service['jenkins']
     }
 
-    file { "${plugin_dir}/${plugin}" :
-      require => Exec["download-${name}"],
-      owner   => 'jenkins',
-      mode    => '0644',
-      notify  => Service['jenkins'],
-    }
   }
 
   if $manage_config {
